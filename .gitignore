@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.env
+
+# data is regenerable — never commit the warehouse
+data/warehouse/
+data/raw/
+transform/target/
+transform/dbt_packages/
+transform/logs/
+.DS_Store
+*.egg-info/

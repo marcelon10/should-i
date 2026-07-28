@@ -1,0 +1,15 @@
+name: should_i
+version: "1.0.0"
+config-version: 2
+profile: should_i
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  should_i:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

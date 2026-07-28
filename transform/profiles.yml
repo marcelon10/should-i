@@ -1,0 +1,9 @@
+# Point dbt at the same DuckDB file the ingestion writes to.
+# Run with:  dbt build --project-dir transform --profiles-dir transform
+should_i:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "../data/warehouse/should_i.duckdb"
+      threads: 4

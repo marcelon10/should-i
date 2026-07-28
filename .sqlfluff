@@ -1,0 +1,31 @@
+[sqlfluff]
+dialect = duckdb
+templater = jinja
+max_line_length = 100
+exclude_rules = RF01, ST06, AM04
+
+[sqlfluff:indentation]
+tab_space_size = 4
+indented_joins = false
+indented_ctes = false
+
+# Stub out dbt's ref()/source() so SQL can be linted without a dbt install.
+# Swap templater to `dbt` once dbt-core is installed for full macro support.
+[sqlfluff:templater:jinja:macros]
+dbt_ref = {% macro ref(model_ref) %}{{ model_ref }}{% endmacro %}
+dbt_source = {% macro source(source_name, table) %}{{ source_name }}_{{ table }}{% endmacro %}
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:aliasing.table]
+aliasing = explicit
+
+[sqlfluff:rules:layout.long_lines]
+ignore_comment_lines = true

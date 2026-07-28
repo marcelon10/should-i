@@ -1,0 +1,65 @@
+# Pre-commit runs the fast half of CI before the commit exists.
+# The goal is that a push which passes locally never fails in CI on a
+# formatting nit — CI failures should mean something.
+#
+#   pip install pre-commit && pre-commit install
+#   pre-commit run --all-files      # first run, on existing code
+#
+# Hook versions are pinned. `pre-commit autoupdate` bumps them deliberately,
+# in a reviewable commit, rather than silently changing behaviour one morning.
+
+default_language_version:
+  python: python3.11
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=500"]   # stops a .duckdb file entering history
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: ["--branch", "main"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-requests]
+        args: [--config-file=pyproject.toml, .]
+        pass_filenames: false
+
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.3.0
+    hooks:
+      - id: sqlfluff-lint
+        files: ^transform/models/.*\.sql$
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.22.1
+    hooks:
+      - id: gitleaks
+
+  # Tests run on push, not on every commit — fast commits, safe pushes.
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (with coverage gate)
+        entry: python -m pytest
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

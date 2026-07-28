@@ -1,0 +1,43 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: main
+    tables:
+      - name: raw_weather_hourly
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after: {count: 8, period: hour}
+          error_after: {count: 24, period: hour}
+
+models:
+  - name: stg_weather_hourly
+    description: One row per location-hour, cleaned and typed.
+    columns:
+      - name: valid_at
+        tests: [not_null]
+      - name: location_name
+        tests: [not_null]
+      - name: temperature_c
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: -60
+              max_value: 60
+      - name: precipitation_prob
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100
+
+  - name: daily_conditions
+    description: >
+      One row per location-day. Facts only — thresholds and verdicts live in
+      the serving layer so preferences can change without a backfill.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [location_name, valid_date]
+    columns:
+      - name: valid_date
+        tests: [not_null]
+      - name: hours_observed
+        tests: [not_null]

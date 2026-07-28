@@ -1,0 +1,134 @@
+name: Daily pipeline
+
+# For a data project, "deployment" means the pipeline actually runs on a
+# schedule against live data and someone finds out when it doesn't. That is
+# what this workflow is: the CD half.
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # 05:00 UTC — before the morning it reports on
+  workflow_dispatch:
+    inputs:
+      offline:
+        description: "Use the fixture instead of the live API"
+        type: boolean
+        default: false
+
+concurrency:
+  group: daily-pipeline      # never let two runs write the warehouse at once
+  cancel-in-progress: false  # let the in-flight run finish
+
+permissions:
+  contents: read
+  issues: write              # to raise an alert when the pipeline breaks
+
+jobs:
+  run:
+    name: Ingest → transform → verify → publish
+    runs-on: ubuntu-latest
+    environment: production   # gate with required reviewers if you want
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - run: pip install -e .
+
+      # The warehouse persists between runs via cache, so history accumulates
+      # instead of every run starting from an empty database. For anything
+      # beyond a personal project this would be real object storage.
+      - name: Restore warehouse
+        uses: actions/cache/restore@v4
+        with:
+          path: data/warehouse
+          key: warehouse-${{ github.run_id }}
+          restore-keys: warehouse-
+
+      - name: Ingest
+        run: |
+          if [ "${{ inputs.offline }}" = "true" ]; then
+            python scripts/make_fixture.py
+            python -m ingestion.run weather --offline
+          else
+            python -m ingestion.run weather
+          fi
+
+      - name: Transform
+        run: python -m transform.build_local
+
+      - name: Quality gates
+        id: quality
+        run: python -m quality.checks
+
+      - name: Publish morning page to the run summary
+        if: success()
+        run: |
+          {
+            echo '## Morning brief'
+            echo '```'
+            python -m serving.morning
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save warehouse
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: data/warehouse
+          key: warehouse-${{ github.run_id }}
+
+      - name: Archive raw payloads
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-${{ github.run_id }}
+          path: data/raw
+          retention-days: 30
+          if-no-files-found: warn
+
+      # A pipeline that fails silently is worse than no pipeline. This turns
+      # every failure into an issue you cannot help but notice.
+      - name: Open an issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `Daily pipeline failed — ${new Date().toISOString().slice(0, 10)}`;
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'pipeline-failure',
+            });
+            const body = [
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`,
+              '',
+              'The daily pipeline failed. Likely causes, in rough order:',
+              '- upstream API changed shape or went down',
+              '- a data quality gate correctly blocked bad data',
+              '- a dependency broke',
+            ].join('\n');
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['pipeline-failure'],
+              });
+            }
