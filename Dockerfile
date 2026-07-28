@@ -1,7 +1,7 @@
 # Multi-stage: the builder has compilers and dev headers, the runtime does not.
 # Smaller image, smaller attack surface, faster pulls.
 
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
@@ -17,7 +17,7 @@ RUN python -m venv /opt/venv && \
 
 # ---------------------------------------------------------------------------
 
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # Never run as root.
 RUN useradd --create-home --uid 10001 pipeline
