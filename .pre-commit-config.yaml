@@ -49,11 +49,6 @@ repos:
       - id: sqlfluff-lint
         files: ^transform/models/.*\.sql$
 
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.22.1
-    hooks:
-      - id: gitleaks
-
   # Tests run on push, not on every commit — fast commits, safe pushes.
   - repo: local
     hooks:
