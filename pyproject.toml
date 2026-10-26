@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A personal decision engine built as a full data platform."
 requires-python = ">=3.11"
 dependencies = [
-    "duckdb>=1.0,<2.0",
+    "duckdb>=1.0,<3.0",
     "requests>=2.31,<3.0",
 ]
 
